@@ -5,23 +5,47 @@ provider "google" {
   region      = "us-central1"
 }
 
-// Create a new instance
-resource "google_compute_instance" "test" {
-  count        = 1 // Adjust as desired
-  name         = "test${count.index + 1}" // yields "test1", "test2", etc. It's also the machine's name and hostname
-  machine_type = "f1-micro" // smallest (CPU &amp; RAM) available instance
-  zone         = "us-central1-b" // yields "europe-west1-d" as setup previously. Places your VM in Europe
+#module "child" {
+#  source = "./child"
+#}
+module "vpc" {
+    #source = "terraform-google-modules/network/google"
+    source = "../Modules/terraform-google-network"
+    project_id   = "bnc-pso-poc"
+    network_name = "example-vpc"
 
- 
-boot_disk {
-initialize_params {
-      image = "debian-cloud/debian-9"
+    subnets = [
+        {
+            subnet_name           = "subnet-01"
+            subnet_ip             = "10.10.10.0/24"
+            subnet_region         = "us-west1"
+        },
+        {
+            subnet_name           = "subnet-02"
+            subnet_ip             = "10.10.20.0/24"
+            subnet_region         = "us-west1"
+            subnet_private_access = "true"
+            subnet_flow_logs      = "true"
+        },
+    ]
+
+    secondary_ranges = {
+        subnet-01 = [
+            {
+                range_name    = "subnet-01-secondary-01"
+                ip_cidr_range = "192.168.64.0/24"
+            },
+        ]
+
+        subnet-02 = []
     }
-  }
-  network_interface {
-    network = "default" 
-    access_config {
-          network_tier = "STANDARD"
-         }
-    } 
-  }
+        routes = [
+        {
+            name                   = "egress-internet"
+            description            = "route through IGW to access internet"
+            destination_range      = "0.0.0.0/0"
+            tags                   = "egress-inet"
+            next_hop_internet      = "true"
+        },
+    ]        
+}
